@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>แผนเบิก-ซื้อพัสดุเพื่อปิดงาน WBS</title>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box}
+body{font-family:'Sarabun',sans-serif;margin:0;background:#f4f6fa;color:#1f2937}
+header{background:linear-gradient(135deg,#5b2c83,#7e3fb3);color:#fff;padding:24px 32px}
+header h1{margin:0 0 6px;font-size:24px}header p{margin:0;opacity:.9;font-size:14px}
+main{max-width:1300px;margin:0 auto;padding:20px}
+.card{background:#fff;border-radius:12px;padding:20px;margin-bottom:18px;box-shadow:0 1px 4px rgba(0,0,0,.08)}
+.card h2{margin:0 0 12px;font-size:18px;color:#5b2c83}
+.hidden{display:none!important}
+.uploads{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:12px}
+@media(max-width:850px){.uploads,.two{grid-template-columns:1fr!important}}
+.drop{display:block;border:2px dashed #a78bfa;border-radius:12px;padding:24px;text-align:center;cursor:pointer;color:#6b21a8;font-size:17px}
+.drop small{display:block;font-size:13px;color:#6b7280;margin-top:6px}
+.drop.over{background:#f3e8ff}.drop.done{border-color:#059669;background:#ecfdf5;color:#065f46}
+.gs{border:1px solid #e9d5ff;background:#faf5ff;border-radius:12px;padding:14px 16px;margin:0 0 12px}
+.gs .row{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:8px}
+input[type=text]{font-family:inherit;font-size:14px;padding:5px 8px;border:1px solid #ccc;border-radius:6px}
+#gsUrl{flex:1;min-width:280px}.gs input.sn{width:130px}
+label.inl{display:inline-flex;align-items:center;gap:6px;margin:0}
+.msg-ok{color:#047857}.msg-err{color:#b91c1c}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:18px;margin-bottom:14px}
+label{display:block;margin:6px 0}label.chk{display:block;margin:3px 0}
+input[type=number],select,textarea{font-family:inherit;font-size:14px;padding:4px 6px;border:1px solid #ccc;border-radius:6px}
+input[type=number]{width:100px}textarea{width:100%}
+button{font-family:inherit;font-size:15px;padding:8px 16px;border-radius:8px;border:1px solid #7e3fb3;background:#fff;color:#7e3fb3;cursor:pointer;margin:2px 6px 2px 0}
+button.primary{background:#7e3fb3;color:#fff}button:disabled{opacity:.5;cursor:wait}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:18px}
+.kpi{background:#fff;border-radius:12px;padding:14px 16px;box-shadow:0 1px 4px rgba(0,0,0,.08);border-left:5px solid #7e3fb3}
+.kpi b{display:block;font-size:26px;color:#5b2c83}.kpi span{font-size:13px;color:#6b7280}
+.kpi.g{border-left-color:#059669}.kpi.g b{color:#047857}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:24px}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{padding:7px 8px;border-bottom:1px solid #eee;text-align:left;vertical-align:top}
+th{background:#f5f0fa;color:#5b2c83;position:sticky;top:0;z-index:1}
+.num{text-align:right;white-space:nowrap}
+.tag{display:inline-block;background:#7e3fb3;color:#fff;border-radius:6px;padding:2px 10px;font-weight:700;white-space:nowrap}
+.tag.sep{background:#dc2626}.tag.stk{background:#059669}
+.code{font-family:monospace;color:#374151}
+.note{font-size:12.5px;color:#92400e;background:#fef3c7;border-radius:4px;padding:1px 6px;display:inline-block;margin:2px 0}
+.note.red{color:#991b1b;background:#fee2e2}.note.green{color:#065f46;background:#d1fae5}
+.pill{display:inline-block;padding:1px 8px;border-radius:10px;font-size:12.5px;font-weight:600;white-space:nowrap}
+.pill.ok{background:#d1fae5;color:#065f46}.pill.part{background:#fef3c7;color:#92400e}.pill.no{background:#fee2e2;color:#991b1b}
+.st-ok{color:#047857;font-weight:600}.st-no{color:#b91c1c;font-weight:600}
+.barwrap{background:#eee;border-radius:5px;height:10px;width:110px;display:inline-block;vertical-align:middle;margin-right:6px}
+.bar{height:10px;background:#7e3fb3;border-radius:5px}
+tr.inbudget>td{background:#ecfdf5}
+details summary{cursor:pointer;color:#7e3fb3;font-size:14px;margin:4px 0}
+details table{font-size:13px;margin-top:6px}
+.scroll{max-height:600px;overflow:auto}
+.muted{color:#6b7280;font-size:13px}
+</style>
+</head>
+<body>
+<header>
+  <h1>แผนเบิก-ซื้อพัสดุ เพื่อปิดงาน WBS ให้ได้มากที่สุด</h1>
+  <p>ขั้นที่ 1 เบิกของในคลังให้ปิดงานได้มากที่สุดโดยไม่ใช้งบ | ขั้นที่ 2 ซื้อเฉพาะส่วนที่ขาด จัดเป็นชุดที่ปิดงานได้มากที่สุด | แหล่งข้อมูล: อัปโหลดไฟล์ หรือ Google Sheet</p>
+</header>
+<main>
+<section class="card">
+  <h2>แหล่งข้อมูล</h2>
+  <div class="uploads">
+    <label class="drop" id="dropW"><input type="file" id="fileW" accept=".xlsx,.xls,.csv" multiple hidden>
+      <b>1) งานค้างเบิก (wbs-mat)</b><small id="infoW">ลากไฟล์มาวาง หรือคลิกเพื่อเลือก</small></label>
+    <label class="drop" id="dropS"><input type="file" id="fileS" accept=".xlsx,.xls,.csv" multiple hidden>
+      <b>2) พัสดุคงคลัง (MB52)</b><small id="infoS">ลากไฟล์มาวาง หรือคลิกเพื่อเลือก (ถ้าไม่ใส่ จะถือว่าต้องซื้อทั้งหมด)</small></label>
+  </div>
+  <div class="gs">
+    <b>หรือ ดึงข้อมูลจาก Google Sheet</b> <span class="muted">(ชีตต้องแชร์แบบ "ทุกคนที่มีลิงก์ - ผู้มีสิทธิ์อ่าน")</span>
+    <div class="row">
+      <input type="text" id="gsUrl" placeholder="ลิงก์ Google Sheet">
+      <label class="inl">ชีตงานค้างเบิก <input type="text" id="gsW" class="sn"></label>
+      <label class="inl">ชีตคงคลัง <input type="text" id="gsS" class="sn"></label>
+    </div>
+    <div class="row">
+      <button id="gsBtn" class="primary">โหลดข้อมูลจาก Google Sheet</button>
+      <label class="inl"><input type="checkbox" id="gsAuto"> โหลดอัตโนมัติเมื่อเปิดหน้าเว็บ</label>
+      <span id="gsInfo" class="muted"></span>
+    </div>
+  </div>
+  <button id="tplW">ไฟล์ตัวอย่าง wbs-mat</button><button id="tplS">ไฟล์ตัวอย่าง MB52</button>
+  <span class="muted">ระบบตรวจชนิดข้อมูลจากหัวคอลัมน์ให้อัตโนมัติ วางไฟล์ผิดช่องก็ไม่เป็นไร</span>
+</section>
+
+<section class="card hidden" id="settings">
+  <h2>ตั้งค่าการวิเคราะห์</h2>
+  <div class="grid">
+    <div><b>กฟฟ. ที่วิเคราะห์</b><div id="peaBox"></div></div>
+    <div><b>ที่เก็บที่นำมาใช้ได้</b><div id="locBox" class="muted">ยังไม่มีข้อมูลคงคลัง</div></div>
+    <div>
+      <b>แบทช์ที่นำมาใช้ได้</b><div id="batchBox" class="muted">-</div>
+      <label>ลำดับการตัดเบิก <select id="prio"><option value="NR">ของใหม่ (N) ก่อน</option><option value="RN">ของเก่า (R) ก่อน</option></select></label>
+      <label>กันสต็อกสำรองไว้ <input type="number" id="reserve" value="0" min="0" max="100"> %</label>
+    </div>
+    <div>
+      <label>จำนวนรหัสที่ซื้อสูงสุดต่อชุด <select id="maxK"><option>1</option><option>2</option><option selected>3</option><option>4</option></select></label>
+      <label>ชุดต้องปิดงานได้อย่างน้อย <input type="number" id="minJobs" value="2" min="1"> งาน</label>
+      <label>จำนวนชุดซื้อสูงสุด <input type="number" id="maxSteps" value="40" min="1"></label>
+      <label>เตือน ⚠ เมื่อยอดต้องการรวม ≥ <input type="number" id="flagQty" value="500"></label>
+    </div>
+    <div>
+      <label>รหัสราคาสูง / ใช้งบแยก (จัดไว้ท้ายแผน)
+        <textarea id="excl" rows="4" placeholder="เช่น&#10;1-05-000-0011"></textarea></label>
+      <label id="priceWrap" class="hidden"><input type="checkbox" id="usePrice" checked> จัดลำดับตาม "งานที่ปิดได้ต่อบาท"</label>
+      <label id="budgetWrap" class="hidden">งบประมาณ (บาท) <input type="number" id="budget" style="width:150px"></label>
+    </div>
+  </div>
+  <button id="runBtn" class="primary">วิเคราะห์</button>
+  <button id="xlsBtn">ส่งออกผลเป็น Excel</button>
+</section>
+
+<div id="out" class="hidden">
+  <section class="kpis" id="kpis"></section>
+  <section class="card"><h2>ปิดงานสะสม: เบิกคลังก่อน แล้วซื้อทีละชุด</h2><canvas id="cumChart" height="100"></canvas></section>
+  <section class="card"><h2>สรุปสำหรับตัดสินใจ: งบระดับไหน ปิดได้กี่งาน</h2><div id="scen"></div></section>
+  <section class="card"><h2>สถานะพัสดุรายรหัส (เทียบความต้องการทุกงานกับคงคลัง)</h2>
+    <label>แสดง <select id="stFilter"><option value="all">ทั้งหมด</option><option value="ok">เบิกได้ครบ</option><option value="part">เบิกบางส่วน + ซื้อ</option><option value="no">ไม่มีในคลัง ต้องซื้อ</option></select></label>
+    <div class="scroll" id="status"></div></section>
+  <section class="card"><h2>แผนเบิก-ซื้อตามลำดับ</h2>
+    <p class="muted">"ซื้อ" คือยอดที่ต้องจัดซื้อจริงหลังหักของในคลังแล้ว ส่วน "เบิกคลังร่วม" คือยอดที่เบิกจากคลังของรหัสเดียวกัน กดดูรายชื่องานเพื่อดูว่าแต่ละรายการเบิกจากที่เก็บไหน</p>
+    <div class="scroll" id="bundles"></div></section>
+  <section class="card"><h2>แผนรายผู้ควบคุมงาน</h2><div class="scroll" id="sups"></div></section>
+  <section class="card"><h2>ใบจัดของตามที่เก็บ</h2><div class="scroll" id="picks"></div></section>
+  <section class="card"><h2>ยอดสั่งซื้อรวมต่อรหัส (ตามแผน)</h2><div class="scroll" id="orders"></div></section>
+  <section class="card two">
+    <div><h2>จำนวนรหัสที่ต้องซื้อต่องาน (หลังหักคลัง)</h2><canvas id="distChart"></canvas></div>
+    <div><h2>งานที่ยังปิดไม่ได้ตามแผน</h2><div class="scroll" id="unclosed" style="max-height:420px"></div></div>
+  </section>
+</div>
+</main>
+
+<script>
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const fmt=(n,d=2)=>Number(n||0).toLocaleString('th-TH',{maximumFractionDigits:d});
+const toNum=v=>{if(typeof v==='number')return v;const n=parseFloat(String(v??'').replace(/,/g,'').trim());return isNaN(n)?0:n;};
+const lab=i=>{let s='';i++;while(i>0){i--;s=String.fromCharCode(65+i%26)+s;i=Math.floor(i/26);}return s;};
+const r3=n=>Math.round((n||0)*1000)/1000;
+const EPS=1e-6;
+const BC={N:'N',R:'R',O:'อื่น'};
+const BCNAME={N:'ของใหม่ (N) / ไม่ระบุแบทช์',R:'ของเก่า (R)',O:'แบทช์ซีเรียล/อื่นๆ'};
+const COLS_W={pea:['กฟฟ.','กฟฟ'],year:['ปีที่ได้มา'],wbs:['องค์ประกอบ WBS','WBS'],name:['ชื่องาน'],
+  sup:['ผู้ควบคุมงาน'],mat:['วัสดุ'],desc:['ข้อความวัสดุ'],qty:['ที่ต้องการ'],price:['ราคาต่อหน่วย','ราคา']};
+const COLS_S={mat:['วัสดุ'],desc:['คำอธิบายวัสดุ'],plant:['Plnt','โรงงาน'],sloc:['SLoc','ที่เก็บ'],
+  loc:['คำอธิบาย'],batch:['แบทช์','Batch'],unit:['BUn','หน่วย'],qty:['ที่ใช้ได้','ใช้ได้']};
+const GS_DEFAULT={url:'https://docs.google.com/spreadsheets/d/1oEiyVoNp_PSb2FiyZN2QMuy9aGZUTkadWNLwI5SJUAY',W:'WBS-MAT',S:'IMP-MB52'};
+let RAW=[],STOCK=[],STOCK_INFO=new Map(),HAS_PRICE=false,RESULT=null,charts={};
+
+function findCol(headers,names){
+  const h=headers.map(x=>String(x).trim());
+  for(const n of names){const i=h.indexOf(n);if(i>=0)return headers[i];}
+  for(const n of names){const i=h.findIndex(x=>x.includes(n));if(i>=0)return headers[i];}
+  return null;
+}
+function mapCols(rows,COLS){const hs=Object.keys(rows[0]);const m={};for(const k in COLS)m[k]=findCol(hs,COLS[k]);return m;}
+function bclass(b){
+  b=String(b??'').trim().toUpperCase();
+  if(!b||b==='น')return'N';
+  if(/^R/.test(b))return'R';if(/^N/.test(b))return'N';
+  if(/^[0-9A-Z]R/.test(b))return'R';if(/^[0-9A-Z]N/.test(b))return'N';
+  return'O';
+}
+
+/* ---------- อ่านชีต: หาแถวหัวตารางอัตโนมัติ (ภายใน 20 แถวแรก) ---------- */
+function rowsFromSheet(ws){
+  const aoa=XLSX.utils.sheet_to_json(ws,{header:1,defval:'',blankrows:false});
+  let hi=aoa.findIndex((r,i)=>i<20&&r.some(c=>String(c).trim()==='วัสดุ'));
+  if(hi<0)hi=0;
+  const seen={};
+  const hs=(aoa[hi]||[]).map((c,i)=>{let h=String(c).trim()||'__col'+i;
+    if(seen[h]!=null){seen[h]++;h=h+'_'+seen[h];}else seen[h]=0;return h;});
+  return aoa.slice(hi+1).filter(r=>r.some(c=>String(c).trim()!==''))
+    .map(r=>{const o={};hs.forEach((h,i)=>o[h]=r[i]??'');return o;});
+}
+function detectType(rows){
+  const h=Object.keys(rows[0]||{}).map(x=>String(x).trim());
+  if(h.some(x=>x.includes('WBS'))||h.includes('ที่ต้องการ'))return'W';
+  if(h.includes('ที่ใช้ได้')||h.includes('SLoc')||h.some(x=>x.includes('แบทช์')))return'S';
+  return null;
+}
+/* คืนค่า null ถ้าสำเร็จ หรือข้อความ error */
+function ingest(rows,src,expect){
+  if(!rows||!rows.length)return'ไม่พบข้อมูลใน '+src;
+  const t=detectType(rows);
+  if(!t)return'ไม่รู้จักรูปแบบข้อมูล (หัวคอลัมน์ไม่ตรง): '+src;
+  if(expect&&t!==expect)return`${src} ดูไม่เหมือนข้อมูล${expect==='W'?'งานค้างเบิก (wbs-mat)':'คงคลัง (MB52)'} กรุณาตรวจชื่อชีต`;
+  return t==='W'?loadWbs(rows,src):loadStock(rows,src);
+}
+
+/* ---------- แหล่งที่ 1: อัปโหลดไฟล์ ---------- */
+function readRows(file){return new Promise((res,rej)=>{const fr=new FileReader();
+  fr.onload=e=>{try{const wb=XLSX.read(new Uint8Array(e.target.result),{type:'array'});
+    res(rowsFromSheet(wb.Sheets[wb.SheetNames[0]]));}catch(err){rej(err);}};
+  fr.onerror=rej;fr.readAsArrayBuffer(file);});}
+
+async function handleFiles(files){
+  for(const f of files){
+    let rows;try{rows=await readRows(f);}catch(e){alert('อ่านไฟล์ไม่ได้: '+f.name);continue;}
+    const err=ingest(rows,'ไฟล์ '+f.name);if(err)alert(err);
+  }
+  afterLoad();
+}
+for(const[d,i]of[['dropW','fileW'],['dropS','fileS']]){
+  const el=$(d);
+  $(i).addEventListener('change',e=>{handleFiles([...e.target.files]);e.target.value='';});
+  ['dragover','dragenter'].forEach(ev=>el.addEventListener(ev,e=>{e.preventDefault();el.classList.add('over');}));
+  ['dragleave','drop'].forEach(ev=>el.addEventListener(ev,e=>{e.preventDefault();el.classList.remove('over');}));
+  el.addEventListener('drop',e=>handleFiles([...e.dataTransfer.files]));
+}
+function afterLoad(){if(!RAW.length&&!STOCK.length)return;buildFilters();if(RAW.length)run();}
+
+/* ---------- แหล่งที่ 2: Google Sheet ---------- */
+const gsId=u=>{const m=String(u).match(/\/d\/([a-zA-Z0-9_-]+)/);return m?m[1]:String(u).trim();};
+const lsGet=k=>{try{return localStorage.getItem(k);}catch(e){return null;}};
+const lsSet=(k,v)=>{try{localStorage.setItem(k,v);}catch(e){}};
+function saveGs(){lsSet('gsUrl',$('gsUrl').value.trim());lsSet('gsW',$('gsW').value.trim());
+  lsSet('gsS',$('gsS').value.trim());lsSet('gsAuto',$('gsAuto').checked?'1':'0');}
+function findSheet(wb,name){
+  const n=name.trim().toLowerCase();
+  return wb.SheetNames.find(s=>s===name)||wb.SheetNames.find(s=>s.trim().toLowerCase()===n)||null;
+}
+async function loadGoogle(){
+  const id=gsId($('gsUrl').value.trim()||GS_DEFAULT.url);
+  const names={W:$('gsW').value.trim()||GS_DEFAULT.W,S:$('gsS').value.trim()||GS_DEFAULT.S};
+  saveGs();
+  const btn=$('gsBtn'),info=$('gsInfo');
+  btn.disabled=true;info.className='muted';info.textContent='กำลังโหลดข้อมูลจาก Google Sheet...';
+  const sheets={},errs=[];
+  try{
+    // วิธีหลัก: ดาวน์โหลดทั้งไฟล์เป็น xlsx (ค่าตรงตามชีต ไม่เพี้ยน)
+    const res=await fetch(`https://docs.google.com/spreadsheets/d/${id}/export?format=xlsx`,{cache:'no-store'});
+    if(!res.ok)throw new Error('HTTP '+res.status);
+    const wb=XLSX.read(new Uint8Array(await res.arrayBuffer()),{type:'array'});
+    for(const k of['W','S']){const sn=findSheet(wb,names[k]);
+      if(sn)sheets[k]=rowsFromSheet(wb.Sheets[sn]);else errs.push(`ไม่พบชีต "${names[k]}" (มี: ${wb.SheetNames.join(', ')})`);}
+  }catch(e){
+    // วิธีสำรอง: ดึงทีละชีตเป็น CSV
+    for(const k of['W','S']){
+      try{
+        const res=await fetch(`https://docs.google.com/spreadsheets/d/${id}/gviz/tq?tqx=out:csv&headers=1&sheet=${encodeURIComponent(names[k])}`,{cache:'no-store'});
+        if(!res.ok)throw new Error('HTTP '+res.status);
+        const txt=await res.text();
+        if(/^\s*</.test(txt)||txt.includes('google.visualization'))throw new Error('ไม่มีสิทธิ์เข้าถึง');
+        const wb=XLSX.read(txt,{type:'string',raw:true});
+        sheets[k]=rowsFromSheet(wb.Sheets[wb.SheetNames[0]]);
+      }catch(e2){errs.push(`${names[k]}: ${e2.message}`);}
+    }
+  }
+  let ok=0;
+  for(const k of['W','S']){
+    if(!sheets[k])continue;
+    const err=ingest(sheets[k],'Google Sheet › '+names[k],k);
+    if(err)errs.push(err);else ok++;
+  }
+  btn.disabled=false;
+  const t=new Date().toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'});
+  if(ok){
+    info.className=errs.length?'msg-err':'msg-ok';
+    info.textContent=`✓ โหลดแล้ว ${ok}/2 ชีต เวลา ${t} น.`+(errs.length?' | ปัญหา: '+errs.join(' | '):'');
+    afterLoad();
+  }else{
+    info.className='msg-err';
+    info.textContent='โหลดไม่สำเร็จ: '+(errs.join(' | ')||'เชื่อมต่อไม่ได้')+' — ตรวจว่าชีตแชร์แบบ "ทุกคนที่มีลิงก์" และชื่อชีตถูกต้อง';
+  }
+}
+
+function loadWbs(rows,name){
+  const m=mapCols(rows,COLS_W);
+  const miss=['wbs','mat','qty'].filter(k=>!m[k]);
+  if(miss.length)return'ข้อมูลงานค้างเบิกไม่พบคอลัมน์: '+miss.map(k=>COLS_W[k][0]).join(', ');
+  const g=(r,k)=>m[k]?String(r[m[k]]??'').trim():'';
+  RAW=rows.map(r=>({pea:g(r,'pea')||'-',year:g(r,'year'),wbs:g(r,'wbs'),name:g(r,'name'),sup:g(r,'sup')||'-',
+    mat:g(r,'mat'),desc:g(r,'desc'),qty:toNum(r[m.qty]),price:m.price?toNum(r[m.price]):0}))
+    .filter(r=>r.wbs&&r.mat&&r.qty>0);
+  $('infoW').textContent=`✓ ${name}: ${RAW.length.toLocaleString()} บรรทัด, ${new Set(RAW.map(r=>r.wbs)).size} งาน`;
+  $('dropW').classList.add('done');
+  return null;
+}
+function loadStock(rows,name){
+  const m=mapCols(rows,COLS_S);
+  const miss=['mat','qty'].filter(k=>!m[k]);
+  if(miss.length)return'ข้อมูลคงคลังไม่พบคอลัมน์: '+miss.map(k=>COLS_S[k][0]).join(', ');
+  const g=(r,k)=>m[k]?String(r[m[k]]??'').trim():'';
+  STOCK_INFO=new Map();
+  STOCK=rows.map(r=>{
+    const plant=g(r,'plant'),sloc=g(r,'sloc'),loc=g(r,'loc'),mat=g(r,'mat');
+    if(mat&&!STOCK_INFO.has(mat))STOCK_INFO.set(mat,{desc:g(r,'desc'),unit:g(r,'unit')});
+    return{mat,plant,sloc,locKey:plant+'|'+sloc,locLabel:[plant&&sloc?plant+'/'+sloc:sloc,loc].filter(Boolean).join(' ')||'-',
+      batch:g(r,'batch'),bcls:m.batch?bclass(r[m.batch]):'N',qty:toNum(r[m.qty])};
+  }).filter(r=>r.mat&&r.qty>0);
+  $('infoS').textContent=`✓ ${name}: ${STOCK.length.toLocaleString()} บรรทัดที่มีของ, ${new Set(STOCK.map(r=>r.mat)).size} รหัส`;
+  $('dropS').classList.add('done');
+  return null;
+}
+
+$('tplW').onclick=()=>downloadTpl([['กฟฟ.','ปีที่ได้มา','องค์ประกอบ WBS','ชื่องาน','ผู้ควบคุมงาน','วัสดุ','ข้อความวัสดุ','ที่ต้องการ','ราคาต่อหน่วย'],
+  ['D051','2567','C-67-D051-0001','ตัวอย่างงาน','นาย ก.','9-09-001-0025','CONCRETE 1/3/5',2.5,'']],'template-wbs-mat.xlsx');
+$('tplS').onclick=()=>downloadTpl([['กลุ่มวัสดุ','วัสดุ','คำอธิบายวัสดุ','Plnt','คำอธิบาย','MTyp','SLoc','แบทช์','BUn','ที่ใช้ได้'],
+  [100001,'1-00-001-0001','POLE 8 M.','D050','จุดกองหมอน 1','ZMAT',6001,'N','EA',692]],'template-MB52.xlsx');
+function downloadTpl(aoa,fn){const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(aoa),'Sheet1');XLSX.writeFile(wb,fn);}
+
+function buildFilters(){
+  if(RAW.length){
+    const peas=[...new Set(RAW.map(r=>r.pea))].sort();
+    $('peaBox').innerHTML=peas.map(p=>`<label class="chk"><input type="checkbox" value="${esc(p)}" checked> ${esc(p)} (${new Set(RAW.filter(r=>r.pea===p).map(r=>r.wbs)).size} งาน)</label>`).join('');
+    HAS_PRICE=RAW.some(r=>r.price>0);
+    $('priceWrap').classList.toggle('hidden',!HAS_PRICE);$('budgetWrap').classList.toggle('hidden',!HAS_PRICE);
+  }
+  if(STOCK.length){
+    const locs=new Map();for(const s of STOCK){if(!locs.has(s.locKey))locs.set(s.locKey,{label:s.locLabel,codes:new Set()});locs.get(s.locKey).codes.add(s.mat);}
+    $('locBox').classList.remove('muted');
+    $('locBox').innerHTML=[...locs].sort((a,b)=>a[0].localeCompare(b[0])).map(([k,v])=>`<label class="chk"><input type="checkbox" value="${esc(k)}" checked> ${esc(v.label)} <span class="muted">(${v.codes.size} รหัส)</span></label>`).join('');
+    const bc={};for(const s of STOCK)bc[s.bcls]=(bc[s.bcls]||0)+1;
+    $('batchBox').classList.remove('muted');
+    $('batchBox').innerHTML=['N','R','O'].filter(b=>bc[b]).map(b=>`<label class="chk"><input type="checkbox" value="${b}" checked> ${BCNAME[b]} <span class="muted">(${bc[b]} บรรทัด)</span></label>`).join('');
+  }
+  $('settings').classList.remove('hidden');
+}
+$('runBtn').onclick=run;$('xlsBtn').onclick=exportXlsx;$('stFilter').onchange=renderStatus;
+
+function getOpt(){
+  const checked=id=>new Set([...document.querySelectorAll('#'+id+' input:checked')].map(i=>i.value));
+  return{maxK:+$('maxK').value,minJobs:Math.max(1,+$('minJobs').value||1),maxSteps:Math.max(1,+$('maxSteps').value||40),
+    flagQty:+$('flagQty').value||Infinity,
+    excluded:new Set($('excl').value.split(/[\s,;]+/).map(s=>s.trim()).filter(Boolean)),
+    usePrice:HAS_PRICE&&$('usePrice').checked,budget:+$('budget').value||0,
+    peas:checked('peaBox'),locs:checked('locBox'),bcls:checked('batchBox'),
+    prio:$('prio').value,reserve:Math.min(100,Math.max(0,+$('reserve').value||0))};
+}
+
+/* ---------- เตรียมข้อมูล ---------- */
+function buildJobs(rows){
+  const jobs=new Map(),mats=new Map();
+  for(const r of rows){
+    if(!jobs.has(r.wbs))jobs.set(r.wbs,{wbs:r.wbs,name:r.name,pea:r.pea,sup:r.sup,year:r.year,need:new Map()});
+    const j=jobs.get(r.wbs);j.need.set(r.mat,(j.need.get(r.mat)||0)+r.qty);
+    if(!mats.has(r.mat))mats.set(r.mat,{code:r.mat,desc:r.desc,price:0,total:0,jobs:new Set(),unit:''});
+    const m=mats.get(r.mat);m.total+=r.qty;m.jobs.add(r.wbs);
+    if(r.price>0&&!m.price)m.price=r.price;if(!m.desc&&r.desc)m.desc=r.desc;
+  }
+  for(const m of mats.values()){const i=STOCK_INFO.get(m.code);if(i){m.unit=i.unit;if(!m.desc)m.desc=i.desc;}}
+  return{jobs:[...jobs.values()],mats};
+}
+function buildLots(opt){
+  const ord=opt.prio==='RN'?{R:0,N:1,O:2}:{N:0,R:1,O:2};const f=1-opt.reserve/100;
+  const agg=new Map();
+  for(const s of STOCK){
+    if(!opt.locs.has(s.locKey)||!opt.bcls.has(s.bcls))continue;
+    const k=s.mat+'|'+s.locKey+'|'+s.bcls;
+    if(!agg.has(k))agg.set(k,{code:s.mat,label:s.locLabel,bcls:s.bcls,qty:0});
+    agg.get(k).qty+=s.qty;
+  }
+  const lots=new Map();
+  for(const l of agg.values()){l.qty*=f;if(l.qty<=EPS)continue;if(!lots.has(l.code))lots.set(l.code,[]);lots.get(l.code).push(l);}
+  for(const a of lots.values())a.sort((x,y)=>ord[x.bcls]-ord[y.bcls]||y.qty-x.qty);
+  return lots;
+}
+
+/* ---------- วางแผน: เบิกคลังก่อน แล้วจัดชุดซื้อ ---------- */
+function plan(jobs,mats,lotsIn,opt){
+  const lots=new Map([...lotsIn].map(([c,a])=>[c,a.map(l=>({...l,rem:l.qty}))]));
+  const avail=c=>{let s=0;for(const l of lots.get(c)||[])s+=l.rem;return s;};
+  const price=c=>mats.get(c).price||0;
+  const bought=new Set(),closed=new Set(),steps=[];let cum=0,cumCost=0,bi=0;
+  const missing=j=>{const r=[];for(const[c,q]of j.need)if(!bought.has(c)&&avail(c)+EPS<q)r.push(c);return r;};
+  const scar=j=>{let s=0;for(const[c,q]of j.need){const a=avail(c);if(a>EPS)s+=q/a;}return s;};
+  const allocate=j=>{const lines=[];
+    for(const[c,q]of j.need){let left=q;const picks=[];
+      for(const l of lots.get(c)||[]){if(left<=EPS)break;const t=Math.min(left,l.rem);if(t>EPS){l.rem-=t;left-=t;picks.push({label:l.label,bcls:l.bcls,qty:t});}}
+      lines.push({code:c,need:q,take:q-Math.max(left,0),buy:left>EPS?left:0,picks});}
+    return lines;};
+  const commit=(label,codes,cl,separate,stockOnly)=>{
+    const done=[],lines=new Map(),buyQty=new Map(),takeQty=new Map(),forced=new Set(),peaCount={};let cost=0;
+    for(const j of cl){
+      if(stockOnly&&missing(j).length)continue;
+      done.push(j);closed.add(j.wbs);peaCount[j.pea]=(peaCount[j.pea]||0)+1;
+      const ls=allocate(j);lines.set(j.wbs,ls);
+      for(const l of ls){
+        if(l.take>EPS)takeQty.set(l.code,(takeQty.get(l.code)||0)+l.take);
+        if(l.buy>EPS){buyQty.set(l.code,(buyQty.get(l.code)||0)+l.buy);cost+=l.buy*price(l.code);
+          if(!bought.has(l.code)){bought.add(l.code);forced.add(l.code);}}
+      }
+    }
+    if(!done.length)return;
+    cum+=done.length;cumCost+=cost;
+    steps.push({label,codes,forced:[...forced],jobs:done,lines,added:done.length,cum,cost,cumCost,buyQty,takeQty,peaCount,separate,stockOnly});
+  };
+  if(lots.size){
+    const free=jobs.filter(j=>missing(j).length===0).sort((a,b)=>scar(a)-scar(b)||a.need.size-b.need.size);
+    commit('คลัง',[],free,false,true);
+  }
+  for(const phase2 of[false,true]){
+    while(bi<opt.maxSteps){
+      const rem=[];
+      for(const j of jobs){
+        if(closed.has(j.wbs))continue;const r=missing(j);
+        if(r.length>opt.maxK)continue;
+        if(!phase2&&r.some(c=>opt.excluded.has(c)))continue;
+        rem.push({j,r});
+      }
+      const cands=new Map();
+      for(const x of rem){if(!x.r.length)continue;const k=[...x.r].sort().join('|');if(!cands.has(k))cands.set(k,x.r);}
+      let best=null;
+      for(const codes of cands.values()){
+        const B=new Set(codes);const cl=rem.filter(x=>x.r.every(c=>B.has(c)));
+        if(cl.length<opt.minJobs)continue;
+        let cost=0;
+        if(opt.usePrice){const nq=new Map();for(const x of cl)for(const c of x.r)nq.set(c,(nq.get(c)||0)+x.j.need.get(c));
+          for(const[c,q]of nq)cost+=Math.max(0,q-avail(c))*price(c);}
+        const score=opt.usePrice?(cost>0?cl.length/cost:Infinity):cl.length/codes.length;
+        if(!best||score>best.score||(score===best.score&&cl.length>best.cl.length))
+          best={codes:[...codes].sort(),cl:cl.map(x=>x.j),score};
+      }
+      if(!best)break;
+      best.codes.forEach(c=>bought.add(c));
+      best.cl.sort((a,b)=>scar(a)-scar(b));
+      commit(lab(bi++),best.codes,best.cl,best.codes.some(c=>opt.excluded.has(c)),false);
+    }
+  }
+  return{steps,missing,avail};
+}
+
+function run(){
+  if(!RAW.length){alert('ยังไม่มีข้อมูลงานค้างเบิก (wbs-mat)');return;}
+  const opt=getOpt();
+  const rows=RAW.filter(r=>opt.peas.has(r.pea));
+  if(!rows.length){alert('ไม่มีข้อมูลตาม กฟฟ. ที่เลือก');return;}
+  const{jobs,mats}=buildJobs(rows);
+  const lots=buildLots(opt);
+  for(const m of mats.values()){
+    const arr=lots.get(m.code)||[];
+    m.stk={N:0,R:0,O:0};for(const l of arr)m.stk[l.bcls]+=l.qty;
+    m.stkLots=arr.map(l=>({label:l.label,bcls:l.bcls,qty:l.qty}));
+    m.stkTotal=m.stk.N+m.stk.R+m.stk.O;
+    m.canTake=Math.min(m.total,m.stkTotal);m.mustBuy=Math.max(0,m.total-m.stkTotal);
+    m.status=m.stkTotal<=EPS?'no':(m.stkTotal+EPS>=m.total?'ok':'part');
+  }
+  const P=plan(jobs,mats,lots,opt);
+  RESULT={jobs,mats,rows,opt,steps:P.steps,missing:P.missing,avail:P.avail};
+  render();
+}
+
+/* ---------- ตัวช่วยแสดงผล ---------- */
+const PILL={ok:'<span class="pill ok">เบิกได้ครบ</span>',part:'<span class="pill part">เบิกบางส่วน + ซื้อ</span>',no:'<span class="pill no">ไม่มีในคลัง ต้องซื้อ</span>'};
+function lineHtml(l){
+  const m=RESULT.mats.get(l.code);const p=[];
+  if(l.take>EPS)p.push(`<span class="st-ok">เบิก ${fmt(l.take)}</span><span class="muted"> (${l.picks.map(k=>`${esc(k.label)} [${BC[k.bcls]}] ${fmt(k.qty)}`).join(', ')})</span>`);
+  if(l.buy>EPS)p.push(`<span class="st-no">ซื้อ ${fmt(l.buy)}</span>`);
+  return `<span class="code">${esc(l.code)}</span> ${esc(m.desc)} ×${fmt(l.need)} ${esc(m.unit)} → ${p.join(' + ')}`;
+}
+function jobStatus(j){const s=RESULT.jobStep.get(j.wbs);
+  return s?(s.stockOnly?'<span class="pill ok">เบิกได้ทันที</span>':`<span class="pill part">รอซื้อชุด ${s.label}</span>`):'<span class="pill no">ยังปิดไม่ได้</span>';}
+function jobTable(list,showStatus){
+  const{mats,jobStep}=RESULT;
+  return `<table><tr>${showStatus?'<th>สถานะ</th>':''}<th>WBS</th><th>ชื่องาน</th><th>กฟฟ.</th><th>ผู้ควบคุมงาน</th><th>รายการ (เบิก / ซื้อ)</th></tr>${list.map(j=>{
+    const s=jobStep.get(j.wbs);const ls=s?s.lines.get(j.wbs):null;
+    return `<tr>${showStatus?`<td>${jobStatus(j)}</td>`:''}<td class="code">${esc(j.wbs)}</td><td>${esc(j.name)}</td><td>${esc(j.pea)}</td><td>${esc(j.sup)}</td>
+      <td>${ls?ls.map(lineHtml).join('<br>'):[...j.need].map(([c,q])=>`<span class="code">${esc(c)}</span> ${esc(mats.get(c).desc)} ×${fmt(q)}`).join('<br>')}</td></tr>`;}).join('')}</table>`;
+}
+
+/* ---------- แสดงผล ---------- */
+function render(){
+  const R=RESULT,{jobs,mats,opt,steps}=R;const total=jobs.length;const money=opt.usePrice;
+  const last=steps.at(-1)||{cum:0,cumCost:0};
+  const s0=steps.find(s=>s.stockOnly);const n0=s0?s0.added:0;
+  const buySteps=steps.filter(s=>!s.stockOnly);
+  const buyCodes=new Set(buySteps.flatMap(s=>[...s.buyQty.keys()]));
+  const pct=n=>total?n/total*100:0;
+  const cnt={ok:0,part:0,no:0};for(const m of mats.values())cnt[m.status]++;
+  const flag=c=>{const m=mats.get(c);return m.total>=opt.flagQty&&m.status!=='ok'?' <span class="note red">⚠ ยอดสูง ควรตรวจสอบ</span>':'';};
+  R.jobStep=new Map();for(const s of steps)for(const j of s.jobs)R.jobStep.set(j.wbs,s);
+  $('out').classList.remove('hidden');
+
+  const peaJobs={};jobs.forEach(j=>peaJobs[j.pea]=(peaJobs[j.pea]||0)+1);
+  $('kpis').innerHTML=[
+    [total,'งานค้างเบิกทั้งหมด (WBS)',''],
+    [n0+' งาน',STOCK.length?`ปิดได้ทันทีจากคลัง ไม่ใช้งบ (${pct(n0).toFixed(0)}%)`:'ยังไม่มีข้อมูลคงคลัง','g'],
+    [last.cum+' งาน',`ปิดได้รวมหลังซื้อตามแผน (${pct(last.cum).toFixed(0)}%)`,''],
+    [mats.size+' รหัส',`ต้องการ: เบิกได้ครบ ${cnt.ok} · บางส่วน ${cnt.part} · ไม่มี ${cnt.no}`,''],
+    [buyCodes.size+' รหัส','ที่ต้องจัดซื้อตามแผน',''],
+    ...(money?[[fmt(last.cumCost,0),'งบจัดซื้อรวมตามแผน (บาท)','']]:[]),
+    [Object.entries(peaJobs).map(([p,n])=>`${esc(p)}: ${n}`).join(' · '),'จำนวนงานแยก กฟฟ.',''],
+  ].map(([b,s,c])=>`<div class="kpi ${c}"><b${String(b).length>14?' style="font-size:16px"':''}>${b}</b><span>${s}</span></div>`).join('');
+
+  const lbl=s=>s.stockOnly?'เบิกคลัง':'ชุด '+s.label;
+  charts.cum&&charts.cum.destroy();
+  charts.cum=new Chart($('cumChart'),{data:{labels:steps.map(lbl),datasets:[
+    {type:'line',label:'ปิดงานสะสม',data:steps.map(s=>s.cum),borderColor:'#5b2c83',backgroundColor:'#5b2c83',yAxisID:'y',tension:.25},
+    {type:'bar',label:'ปิดเพิ่มในขั้นนี้',data:steps.map(s=>s.added),backgroundColor:steps.map(s=>s.stockOnly?'#34d399':s.separate?'#f87171':'#c4b5fd'),yAxisID:'y1'}]},
+    options:{responsive:true,interaction:{mode:'index',intersect:false},
+      plugins:{tooltip:{callbacks:{afterBody:it=>{const s=steps[it[0].dataIndex];
+        return[s.stockOnly?'เบิกจากคลังอย่างเดียว ไม่ต้องซื้อ':'ซื้อ: '+[...s.buyQty.keys()].join(', '),`สะสม ${pct(s.cum).toFixed(1)}%`].concat(money?['งบสะสม '+fmt(s.cumCost,0)+' บาท']:[]);}}}},
+      scales:{y:{position:'left',beginAtZero:true,title:{display:true,text:'ปิดงานสะสม'}},
+        y1:{position:'right',beginAtZero:true,grid:{drawOnChartArea:false},title:{display:true,text:'ปิดเพิ่ม'}}}}});
+
+  const row=(a,b,c,d,e)=>`<tr><td>${a}</td><td>${b}</td><td class="num">${c}</td><td class="num"><b>${d}</b></td><td class="num">${pct(d).toFixed(0)}%</td>${money?`<td class="num">${fmt(e,0)}</td>`:''}</tr>`;
+  let sc=`<table><tr><th>ถ้างบมี...</th><th>ดำเนินการ</th><th class="num">รหัสที่ซื้อ</th><th class="num">ปิดงาน</th><th class="num">% จาก ${total} งาน</th>${money?'<th class="num">งบ (บาท)</th>':''}</tr>`;
+  if(s0)sc+=row('ไม่มีงบเลย','เบิกคลังอย่างเดียว',0,n0,0);
+  const used=new Set();
+  for(const[name,f]of[['น้อยมาก',.2],['น้อย',.4],['ปานกลาง',.6],['พอสมควร',.8],['มาก',.95],['เต็มแผน',1]]){
+    const i=buySteps.findIndex(s=>s.cum-n0>=f*(last.cum-n0)-EPS);if(i<0||used.has(i))continue;used.add(i);
+    const s=buySteps[i];const codes=new Set(buySteps.slice(0,i+1).flatMap(x=>[...x.buyQty.keys()])).size;
+    sc+=row(name,(s0?'เบิกคลัง + ':'')+'ซื้อชุด '+(i===0?'A':'A ถึง '+s.label),codes,s.cum,s.cumCost);
+  }
+  $('scen').innerHTML=sc+'</table>';
+
+  renderStatus();
+
+  const nc=money?9:7;
+  let h=`<table><tr><th>ขั้น</th><th>สิ่งที่ต้องทำ</th><th class="num">ซื้อ</th><th class="num">เบิกคลังร่วม</th><th class="num">ปิดเพิ่ม</th><th>สะสม</th>${money?'<th class="num">งบขั้นนี้</th><th class="num">งบสะสม</th>':''}<th>หมายเหตุ</th></tr>`;
+  for(const s of steps){
+    const inB=money&&opt.budget>0&&s.cumCost<=opt.budget;const notes=[];let what,qb,qt;
+    if(s.stockOnly){
+      what=`<b class="st-ok">เบิกจากคลังอย่างเดียว ไม่ต้องซื้อ</b><br><span class="muted">ใช้ของในคลัง ${s.takeQty.size} รหัส</span>`;qb='-';qt='-';
+      notes.push('<span class="note green">เริ่มเบิกได้ทันที</span>');
+    }else{
+      const cs=[...new Set([...s.codes,...s.buyQty.keys()])];
+      what=cs.map(c=>`<span class="code">${esc(c)}</span> ${esc(mats.get(c).desc)}${flag(c)} ${mats.get(c).status==='part'?'<span class="pill part">มีในคลังบางส่วน</span>':''}`).join('<br>');
+      qb=cs.map(c=>`<span class="st-no">${fmt(s.buyQty.get(c)||0)}</span>`).join('<br>');
+      qt=cs.map(c=>s.takeQty.get(c)?`<span class="st-ok">${fmt(s.takeQty.get(c))}</span>`:'-').join('<br>');
+      if(s.separate)notes.push('<span class="note red">ของราคาสูง ใช้งบแยก</span>');
+      if(s.codes.length>1)notes.push('<span class="note">ต้องซื้อครบทั้งชุด</span>');
+      if(s.forced.length)notes.push(`<span class="note red">ซื้อเพิ่มเพราะคลังไม่พอ: ${s.forced.map(esc).join(', ')}</span>`);
+      const other=[...s.takeQty.keys()].filter(c=>!cs.includes(c)).length;
+      if(other)notes.push(`<span class="note green">รายการอื่นเบิกจากคลัง ${other} รหัส</span>`);
+    }
+    notes.push(`<span class="muted">${Object.entries(s.peaCount).map(([p,n])=>`${esc(p)} ${n}`).join(' · ')}</span>`);
+    h+=`<tr class="${inB?'inbudget':''}"><td><span class="tag ${s.stockOnly?'stk':s.separate?'sep':''}">${s.stockOnly?'เบิกคลัง':s.label}</span></td>
+      <td>${what}</td><td class="num">${qb}</td><td class="num">${qt}</td><td class="num"><b>${s.added}</b></td>
+      <td class="num"><span class="barwrap"><div class="bar" style="width:${pct(s.cum)}%"></div></span>${s.cum} (${pct(s.cum).toFixed(0)}%)</td>
+      ${money?`<td class="num">${fmt(s.cost,0)}</td><td class="num">${fmt(s.cumCost,0)}</td>`:''}<td>${notes.join('<br>')}</td></tr>
+      <tr${inB?' class="inbudget"':''}><td></td><td colspan="${nc-1}"><details><summary>ดูรายชื่อ ${s.added} งาน พร้อมรายการเบิก/ซื้อ</summary>${jobTable(s.jobs,false)}</details></td></tr>`;
+  }
+  $('bundles').innerHTML=steps.length?h+'</table>':'<p>ไม่พบงานที่ปิดได้ตามเงื่อนไข ลองเพิ่ม "จำนวนรหัสที่ซื้อสูงสุดต่อชุด" หรือลด "ปิดงานได้อย่างน้อย"</p>';
+
+  const sup=new Map();
+  for(const j of jobs){if(!sup.has(j.sup))sup.set(j.sup,{now:[],wait:[],no:[]});const s=R.jobStep.get(j.wbs);
+    sup.get(j.sup)[s?(s.stockOnly?'now':'wait'):'no'].push(j);}
+  R.sup=sup;
+  $('sups').innerHTML=`<table><tr><th>ผู้ควบคุมงาน</th><th class="num">งานทั้งหมด</th><th class="num">เบิกได้ทันที</th><th class="num">รอซื้อ</th><th class="num">ยังปิดไม่ได้</th></tr>
+    ${[...sup].sort((a,b)=>b[1].now.length-a[1].now.length||b[1].wait.length-a[1].wait.length).map(([n,g])=>`<tr><td><b>${esc(n)}</b>
+      ${g.now.length+g.wait.length?`<details><summary>ดูแผนเบิก ${g.now.length+g.wait.length} งาน</summary>${jobTable([...g.now,...g.wait],true)}</details>`:''}</td>
+      <td class="num">${g.now.length+g.wait.length+g.no.length}</td><td class="num st-ok">${g.now.length||'-'}</td><td class="num">${g.wait.length||'-'}</td><td class="num st-no">${g.no.length||'-'}</td></tr>`).join('')}</table>`;
+
+  const pick=new Map();
+  for(const s of steps)for(const j of s.jobs)for(const l of s.lines.get(j.wbs))for(const p of l.picks){
+    if(!pick.has(p.label))pick.set(p.label,new Map());const m=pick.get(p.label);const k=l.code+'|'+p.bcls;
+    if(!m.has(k))m.set(k,{code:l.code,bcls:p.bcls,now:0,res:0,jobs:new Set()});
+    const o=m.get(k);if(s.stockOnly)o.now+=p.qty;else o.res+=p.qty;o.jobs.add(j.wbs);}
+  R.pick=pick;
+  $('picks').innerHTML=pick.size?[...pick].sort((a,b)=>b[1].size-a[1].size).map(([loc,m])=>`<details><summary><b>${esc(loc)}</b> (${m.size} รายการ)</summary>
+    <table><tr><th>รหัส</th><th>ข้อความวัสดุ</th><th>แบทช์</th><th class="num">เบิกทันที</th><th class="num">จองไว้ให้งานรอซื้อ</th><th>หน่วย</th><th class="num">จำนวนงาน</th></tr>
+    ${[...m.values()].sort((a,b)=>a.code.localeCompare(b.code)).map(o=>`<tr><td class="code">${esc(o.code)}</td><td>${esc(mats.get(o.code).desc)}</td><td>${BC[o.bcls]}</td>
+    <td class="num st-ok">${o.now?fmt(o.now):'-'}</td><td class="num">${o.res?fmt(o.res):'-'}</td><td>${esc(mats.get(o.code).unit)}</td><td class="num">${o.jobs.size}</td></tr>`).join('')}</table></details>`).join('')
+    :'<p class="muted">ไม่มีรายการเบิกจากคลัง</p>';
+
+  const ord=new Map();
+  for(const s of buySteps)for(const j of s.jobs)for(const l of s.lines.get(j.wbs)){
+    if(l.buy<=EPS)continue;if(!ord.has(l.code))ord.set(l.code,{q:0,take:0,jobs:0,first:s.label});
+    const o=ord.get(l.code);o.q+=l.buy;o.take+=l.take;o.jobs++;}
+  R.ord=ord;
+  $('orders').innerHTML=ord.size?`<table><tr><th>รหัส</th><th>ข้อความวัสดุ</th><th>สถานะคลัง</th><th class="num">ยอดซื้อ</th><th class="num">เบิกคลังสมทบ</th><th>หน่วย</th><th class="num">ใช้ในงาน</th><th>เริ่มในชุด</th>${money?'<th class="num">ราคา/หน่วย</th><th class="num">มูลค่า</th>':''}</tr>
+    ${[...ord].sort((a,b)=>b[1].jobs-a[1].jobs).map(([c,o])=>{const m=mats.get(c);return`<tr><td class="code">${esc(c)}</td><td>${esc(m.desc)}${flag(c)}</td><td>${PILL[m.status]}</td>
+    <td class="num st-no">${fmt(o.q)}</td><td class="num">${o.take>EPS?fmt(o.take):'-'}</td><td>${esc(m.unit)}</td><td class="num">${o.jobs}</td><td>${o.first}</td>
+    ${money?`<td class="num">${fmt(m.price)}</td><td class="num">${fmt(o.q*m.price,0)}</td>`:''}</tr>`;}).join('')}</table>`:'<p class="muted">ไม่ต้องซื้อพัสดุ</p>';
+
+  const nb=j=>[...j.need].filter(([c,q])=>mats.get(c).stkTotal+EPS<q).length;
+  const bk=[['ไม่ต้องซื้อ',0,0],['1',1,1],['2',2,2],['3',3,3],['4',4,4],['5',5,5],['6–10',6,10],['11–20',11,20],['21+',21,1e9]];
+  charts.dist&&charts.dist.destroy();
+  charts.dist=new Chart($('distChart'),{type:'bar',data:{labels:bk.map(b=>b[1]===0?b[0]:'ซื้อ '+b[0]+' รหัส'),
+    datasets:[{label:'จำนวนงาน',data:bk.map(([,a,b])=>jobs.filter(j=>{const n=nb(j);return n>=a&&n<=b;}).length),
+    backgroundColor:bk.map((_,i)=>i===0?'#34d399':i<4?'#7e3fb3':'#d8b4fe')}]},options:{plugins:{legend:{display:false}}}});
+
+  const un=jobs.filter(j=>!R.jobStep.has(j.wbs)).map(j=>({j,r:R.missing(j)})).sort((a,b)=>a.r.length-b.r.length);
+  R.unclosed=un;
+  $('unclosed').innerHTML=un.length?`<table><tr><th>WBS / ชื่องาน</th><th>ผู้ควบคุมงาน</th><th class="num">ต้องซื้อ</th><th>รายการที่ขาด</th></tr>
+    ${un.map(({j,r})=>`<tr><td class="code">${esc(j.wbs)}<br><span class="muted">${esc(j.name)}</span></td><td>${esc(j.sup)}</td><td class="num">${r.length}/${j.need.size}</td>
+    <td>${r.slice(0,6).map(c=>`<span class="code">${esc(c)}</span> ${esc(mats.get(c).desc)} ×${fmt(j.need.get(c))}`).join('<br>')}${r.length>6?`<br><span class="muted">และอีก ${r.length-6} รายการ</span>`:''}</td></tr>`).join('')}</table>`:'<p class="st-ok">ปิดได้ครบทุกงาน</p>';
+}
+
+function renderStatus(){
+  if(!RESULT)return;const{mats,opt}=RESULT;const f=$('stFilter').value;
+  const list=[...mats.values()].filter(m=>f==='all'||m.status===f).sort((a,b)=>b.jobs.size-a.jobs.size);
+  $('status').innerHTML=`<table><tr><th>รหัส</th><th>ข้อความวัสดุ</th><th>หน่วย</th><th class="num">ต้องการรวม</th><th class="num">ใช้ในงาน</th><th class="num">คลัง N</th><th class="num">คลัง R</th><th class="num">อื่นๆ</th><th class="num">ยอดเบิก</th><th class="num">ยอดซื้อ</th><th>สถานะ</th><th>ที่เก็บที่มีของ</th></tr>
+    ${list.map(m=>`<tr><td class="code">${esc(m.code)}</td><td>${esc(m.desc)}${m.total>=opt.flagQty&&m.status!=='ok'?' <span class="note red">⚠</span>':''}</td><td>${esc(m.unit)}</td>
+    <td class="num">${fmt(m.total)}</td><td class="num">${m.jobs.size}</td>
+    <td class="num">${m.stk.N?fmt(m.stk.N):'-'}</td><td class="num">${m.stk.R?fmt(m.stk.R):'-'}</td><td class="num">${m.stk.O?fmt(m.stk.O):'-'}</td>
+    <td class="num st-ok">${m.canTake>EPS?fmt(m.canTake):'-'}</td><td class="num st-no">${m.mustBuy>EPS?fmt(m.mustBuy):'-'}</td><td>${PILL[m.status]}</td>
+    <td class="muted">${m.stkLots.map(l=>`${esc(l.label)} [${BC[l.bcls]}] ${fmt(l.qty)}`).join('<br>')}</td></tr>`).join('')}</table>
+    <p class="muted">ยอดเบิก/ยอดซื้อในตารางนี้คิดจากความต้องการของทุกงานรวมกัน ส่วนยอดตามแผนจริงดูได้ในหัวข้อ "แผนเบิก-ซื้อ" และ "ยอดสั่งซื้อรวม"</p>`;
+}
+
+/* ---------- ส่งออก Excel ---------- */
+function exportXlsx(){
+  if(!RESULT){alert('ยังไม่มีผลการวิเคราะห์');return;}
+  const{jobs,mats,steps,ord,pick,sup,unclosed}=RESULT;const total=jobs.length;const wb=XLSX.utils.book_new();
+  const add=(rows,name)=>XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(rows.length?rows:[{'หมายเหตุ':'ไม่มีข้อมูล'}]),name);
+  const stName={ok:'เบิกได้ครบ',part:'เบิกบางส่วน + ซื้อ',no:'ไม่มีในคลัง ต้องซื้อ'};
+  const stepName=s=>s.stockOnly?'เบิกคลัง':s.label;
+
+  add([...mats.values()].sort((a,b)=>b.jobs.size-a.jobs.size).map(m=>({'รหัส':m.code,'ข้อความวัสดุ':m.desc,'หน่วย':m.unit,
+    'ต้องการรวม':r3(m.total),'ใช้ในงาน':m.jobs.size,'คลัง N':r3(m.stk.N),'คลัง R':r3(m.stk.R),'คลังอื่นๆ':r3(m.stk.O),
+    'ยอดเบิก':r3(m.canTake),'ยอดซื้อ':r3(m.mustBuy),'สถานะ':stName[m.status],
+    'ที่เก็บ':m.stkLots.map(l=>`${l.label} [${BC[l.bcls]}] ${r3(l.qty)}`).join('; ')})),'สถานะพัสดุ');
+
+  const L=[];
+  for(const s of steps)for(const j of s.jobs)for(const l of s.lines.get(j.wbs))L.push({'ขั้น':stepName(s),
+    'สถานะงาน':s.stockOnly?'เบิกได้ทันที':'รอซื้อชุด '+s.label,'WBS':j.wbs,'ชื่องาน':j.name,'กฟฟ.':j.pea,'ปีที่ได้มา':j.year,
+    'ผู้ควบคุมงาน':j.sup,'รหัส':l.code,'ข้อความวัสดุ':mats.get(l.code).desc,'หน่วย':mats.get(l.code).unit,'ต้องการ':r3(l.need),
+    'เบิกจากคลัง':r3(l.take),'เบิกจาก (ที่เก็บ/แบทช์)':l.picks.map(p=>`${p.label} [${BC[p.bcls]}] ${r3(p.qty)}`).join('; '),'ต้องซื้อ':r3(l.buy)});
+  add(L,'แผนเบิก-ซื้อรายงาน');
+
+  const S=[];
+  for(const s of steps){
+    const cs=s.stockOnly?[...s.takeQty.keys()]:[...new Set([...s.codes,...s.buyQty.keys()])];
+    for(const c of cs)S.push({'ขั้น':stepName(s),'รหัส':c,'ข้อความวัสดุ':mats.get(c).desc,'ยอดซื้อ':r3(s.buyQty.get(c)||0),
+      'เบิกคลัง':r3(s.takeQty.get(c)||0),'ปิดงานเพิ่ม':s.added,'ปิดงานสะสม':s.cum,'% สะสม':+(s.cum/total*100).toFixed(1),
+      'งบขั้นนี้':Math.round(s.cost),'งบสะสม':Math.round(s.cumCost),'ใช้งบแยก':s.separate?'ใช่':''});
+  }
+  add(S,'ลำดับขั้น-ชุดซื้อ');
+
+  add([...ord].map(([c,o])=>({'รหัส':c,'ข้อความวัสดุ':mats.get(c).desc,'หน่วย':mats.get(c).unit,'สถานะคลัง':stName[mats.get(c).status],
+    'ยอดซื้อ':r3(o.q),'เบิกคลังสมทบ':r3(o.take),'ใช้ในงาน':o.jobs,'เริ่มในชุด':o.first,
+    'ราคาต่อหน่วย':mats.get(c).price,'มูลค่า':Math.round(o.q*mats.get(c).price)})),'ยอดซื้อรวมต่อรหัส');
+
+  const P=[];
+  for(const[loc,m]of pick)for(const o of m.values())P.push({'ที่เก็บ':loc,'รหัส':o.code,'ข้อความวัสดุ':mats.get(o.code).desc,
+    'แบทช์':BC[o.bcls],'เบิกทันที':r3(o.now),'จองไว้ให้งานรอซื้อ':r3(o.res),'หน่วย':mats.get(o.code).unit,
+    'จำนวนงาน':o.jobs.size,'WBS':[...o.jobs].join(', ')});
+  add(P,'ใบจัดตามที่เก็บ');
+
+  add([...sup].map(([n,g])=>({'ผู้ควบคุมงาน':n,'งานทั้งหมด':g.now.length+g.wait.length+g.no.length,
+    'เบิกได้ทันที':g.now.length,'รอซื้อ':g.wait.length,'ยังปิดไม่ได้':g.no.length,
+    'WBS เบิกได้ทันที':g.now.map(j=>j.wbs).join(', ')})),'สรุปผู้ควบคุมงาน');
+
+  add(unclosed.map(({j,r})=>({'WBS':j.wbs,'ชื่องาน':j.name,'กฟฟ.':j.pea,'ผู้ควบคุมงาน':j.sup,'รายการทั้งหมด':j.need.size,
+    'รหัสที่ขาด':r.length,'รายการที่ขาด':r.map(c=>`${c} x${r3(j.need.get(c))}`).join('; ')})),'งานที่ยังปิดไม่ได้');
+
+  XLSX.writeFile(wb,'แผนเบิก-ซื้อพัสดุเพื่อปิดงาน.xlsx');
+}
+
+/* ---------- เริ่มต้น: ตั้งค่า Google Sheet และโหลดอัตโนมัติ ---------- */
+(function initGs(){
+  $('gsUrl').value=lsGet('gsUrl')||GS_DEFAULT.url;
+  $('gsW').value=lsGet('gsW')||GS_DEFAULT.W;
+  $('gsS').value=lsGet('gsS')||GS_DEFAULT.S;
+  $('gsAuto').checked=lsGet('gsAuto')!=='0';
+  $('gsBtn').onclick=loadGoogle;
+  $('gsAuto').onchange=saveGs;
+  if($('gsAuto').checked)loadGoogle();
+})();
+</script>
+</body>
+</html>
